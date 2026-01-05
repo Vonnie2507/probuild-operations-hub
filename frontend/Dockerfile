@@ -12,28 +12,26 @@ RUN npm ci
 COPY . .
 
 # Set the API URL at build time
-ARG VITE_API_URL
+ARG VITE_API_URL=https://probuild-operations-hub-production.up.railway.app/api
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build the app
 RUN npm run build
 
-# Production stage - serve with nginx
-FROM nginx:alpine
+# Production stage - serve with a simple node server
+FROM node:20-alpine
 
-# Copy built files to nginx
-COPY --from=builder /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copy nginx config for SPA routing
-RUN echo 'server { \
-    listen 80; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html; \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Install serve
+RUN npm install -g serve
 
-EXPOSE 80
+# Copy built files
+COPY --from=builder /app/dist ./dist
 
-CMD ["nginx", "-g", "daemon off;"]
+# Railway uses PORT env variable
+ENV PORT=3000
+EXPOSE 3000
+
+# Serve the app
+CMD ["sh", "-c", "serve -s dist -l $PORT"]
