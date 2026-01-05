@@ -1,0 +1,368 @@
+// ============================================
+// PROBUILD OPERATIONS HUB
+// Database Schema (Prisma)
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(STAFF)
+  password  String   // Hashed
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  documents          LiveDocument[]      @relation("CreatedBy")
+  documentChanges    DocumentChange[]
+  prestartMeetings   PrestartMeeting[]
+  uploadedFiles      DocumentFile[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  SALES
+  SCHEDULER
+  PRODUCTION
+  INSTALLATION
+  STAFF
+}
+
+// ============================================
+// LIVE PROJECT DOCUMENTS
+// ============================================
+
+model LiveDocument {
+  id        String         @id @default(uuid())
+  status    DocumentStatus @default(LEAD)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  // Link to Jobman (nullable - can exist without Jobman link)
+  jobmanLeadId  String? @map("jobman_lead_id")
+  jobmanQuoteId String? @map("jobman_quote_id")
+  jobmanJobId   String? @map("jobman_job_id")
+
+  // Customer Info (can be pulled from Jobman or entered manually)
+  customerName    String  @map("customer_name")
+  customerEmail   String? @map("customer_email")
+  customerPhone   String? @map("customer_phone")
+  customerMobile  String? @map("customer_mobile")
+
+  // Site Address
+  siteAddress       String? @map("site_address")
+  siteAddressLine1  String? @map("site_address_line1")
+  siteAddressLine2  String? @map("site_address_line2")
+  siteCity          String? @map("site_city")
+  siteState         String? @map("site_state")
+  sitePostcode      String? @map("site_postcode")
+
+  // ============================================
+  // EXTENDED FIELDS (not in Jobman)
+  // ============================================
+
+  // Site Access Details
+  siteAccess        String? @map("site_access") @db.Text
+  parkingDetails    String? @map("parking_details") @db.Text
+  gateCode          String? @map("gate_code")
+  keyLocation       String? @map("key_location")
+
+  // Ground & Site Conditions
+  groundConditions  String? @map("ground_conditions") @db.Text // Rocky, sandy, clay, etc.
+  slopeDetails      String? @map("slope_details") @db.Text
+  undergroundServices String? @map("underground_services") @db.Text // Power, water, gas, etc.
+  dbydReference     String? @map("dbyd_reference") // Dial Before You Dig reference
+
+  // Existing Fence
+  existingFence     String? @map("existing_fence") @db.Text
+  removalRequired   Boolean @default(false) @map("removal_required")
+  removalNotes      String? @map("removal_notes") @db.Text
+
+  // Utilities
+  powerAvailable    Boolean @default(false) @map("power_available")
+  waterAvailable    Boolean @default(false) @map("water_available")
+  toiletAvailable   Boolean @default(false) @map("toilet_available")
+
+  // Special Requirements
+  dogOnProperty     Boolean @default(false) @map("dog_on_property")
+  dogDetails        String? @map("dog_details")
+  neighbourContact  String? @map("neighbour_contact") @db.Text
+  councilApproval   Boolean @default(false) @map("council_approval")
+  councilReference  String? @map("council_reference")
+  specialRequirements String? @map("special_requirements") @db.Text
+
+  // Scheduling Preferences
+  preferredDays     String[] @map("preferred_days") // Array of days
+  preferredTimes    String? @map("preferred_times")
+  accessRestrictions String? @map("access_restrictions") @db.Text
+
+  // Installation Notes
+  installNotes      String? @map("install_notes") @db.Text
+  productionNotes   String? @map("production_notes") @db.Text
+
+  // Custom Fields (JSON for anything else)
+  customFields      Json?   @map("custom_fields") @default("{}")
+
+  // Created By
+  createdById       String  @map("created_by_id")
+  createdBy         User    @relation("CreatedBy", fields: [createdById], references: [id])
+
+  // Relations
+  files             DocumentFile[]
+  changes           DocumentChange[]
+  communications    Communication[]
+  prestartJobs      PrestartMeetingJob[]
+
+  @@index([jobmanLeadId])
+  @@index([jobmanQuoteId])
+  @@index([jobmanJobId])
+  @@index([status])
+  @@index([customerName])
+  @@map("live_documents")
+}
+
+enum DocumentStatus {
+  LEAD          // Sales gathering info
+  QUOTED        // Quote sent, waiting response
+  ACCEPTED      // Quote accepted, scheduling
+  SCHEDULED     // Installation scheduled
+  IN_PROGRESS   // Currently installing
+  COMPLETED     // Job complete
+  CANCELLED     // Cancelled
+  ON_HOLD       // On hold
+}
+
+// ============================================
+// DOCUMENT FILES
+// ============================================
+
+model DocumentFile {
+  id          String   @id @default(uuid())
+  documentId  String   @map("document_id")
+  document    LiveDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  fileName    String   @map("file_name")
+  fileType    FileType @map("file_type")
+  fileUrl     String   @map("file_url")
+  thumbnailUrl String? @map("thumbnail_url")
+  fileSize    Int?     @map("file_size") // bytes
+  mimeType    String?  @map("mime_type")
+
+  // Categorisation
+  section     FileSection @default(GENERAL)
+  description String?  @db.Text
+
+  // Metadata
+  uploadedById String  @map("uploaded_by_id")
+  uploadedBy   User    @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  // If synced to Jobman
+  jobmanFileId String? @map("jobman_file_id")
+
+  @@index([documentId])
+  @@index([section])
+  @@map("document_files")
+}
+
+enum FileType {
+  IMAGE
+  VIDEO
+  PDF
+  DOCUMENT
+  OTHER
+}
+
+enum FileSection {
+  GENERAL
+  SITE_PHOTOS
+  MEASUREMENTS
+  PROGRESS
+  COMPLETION
+  SIGNOFF
+  COMMUNICATIONS
+}
+
+// ============================================
+// CHANGE TRACKING (AUDIT TRAIL)
+// ============================================
+
+model DocumentChange {
+  id          String   @id @default(uuid())
+  documentId  String   @map("document_id")
+  document    LiveDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  fieldName   String   @map("field_name")
+  oldValue    String?  @map("old_value") @db.Text
+  newValue    String?  @map("new_value") @db.Text
+
+  changedById String   @map("changed_by_id")
+  changedBy   User     @relation(fields: [changedById], references: [id])
+  changedAt   DateTime @default(now()) @map("changed_at")
+
+  // Approval workflow
+  approvalRequired Boolean @default(false) @map("approval_required")
+  approvedById     String? @map("approved_by_id")
+  approvedAt       DateTime? @map("approved_at")
+
+  @@index([documentId])
+  @@index([fieldName])
+  @@index([changedAt])
+  @@map("document_changes")
+}
+
+// ============================================
+// COMMUNICATIONS (attached to documents)
+// ============================================
+
+model Communication {
+  id          String   @id @default(uuid())
+  documentId  String   @map("document_id")
+  document    LiveDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  type        CommunicationType
+  direction   CommunicationDirection @default(INBOUND)
+  subject     String?
+  content     String   @db.Text
+  sender      String?  // Email/phone of sender
+  recipient   String?  // Email/phone of recipient
+  receivedAt  DateTime @map("received_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // AI-extracted info
+  aiExtractedData Json? @map("ai_extracted_data")
+
+  @@index([documentId])
+  @@index([type])
+  @@map("communications")
+}
+
+enum CommunicationType {
+  EMAIL
+  SMS
+  PHONE_CALL
+  MEETING_NOTE
+  OTHER
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+// ============================================
+// PRE-START MEETINGS
+// ============================================
+
+model PrestartMeeting {
+  id          String   @id @default(uuid())
+  meetingDate DateTime @map("meeting_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Who ran the meeting
+  runById     String   @map("run_by_id")
+  runBy       User     @relation(fields: [runById], references: [id])
+
+  // Staff present (array of names or user IDs)
+  staffPresent String[] @map("staff_present")
+
+  // Recording & Transcript
+  recordingUrl String? @map("recording_url")
+  transcript   String? @db.Text
+  transcriptStatus TranscriptStatus @default(NONE) @map("transcript_status")
+
+  // AI-generated summary
+  aiSummary    Json?   @map("ai_summary")
+  // Structure: {
+  //   challenges: [{ description, resolution }],
+  //   wins: [{ description }],
+  //   safetyTopics: [{ topic, notes }],
+  //   actionItems: [{ item, assignee }]
+  // }
+
+  // Manual notes (if any)
+  manualNotes  String? @map("manual_notes") @db.Text
+
+  // Jobs discussed
+  jobs         PrestartMeetingJob[]
+
+  @@index([meetingDate])
+  @@map("prestart_meetings")
+}
+
+enum TranscriptStatus {
+  NONE
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Link between pre-start meetings and live documents
+model PrestartMeetingJob {
+  id            String   @id @default(uuid())
+  prestartId    String   @map("prestart_id")
+  prestart      PrestartMeeting @relation(fields: [prestartId], references: [id], onDelete: Cascade)
+  documentId    String   @map("document_id")
+  document      LiveDocument @relation(fields: [documentId], references: [id])
+
+  // Installer assigned to this job that day
+  installerName String   @map("installer_name")
+
+  // Which day of the job (yesterday or today)
+  dayType       DayType  @map("day_type")
+
+  // Compliance data (from Jobman or manual)
+  clockedIn     Boolean  @default(false) @map("clocked_in")
+  clockedOut    Boolean  @default(false) @map("clocked_out")
+  checkedIn     Boolean  @default(false) @map("checked_in")
+  checkedOut    Boolean  @default(false) @map("checked_out")
+  photosUploaded Boolean @default(false) @map("photos_uploaded")
+  tasksCompleted Boolean @default(false) @map("tasks_completed")
+
+  // Notes for this job in this meeting
+  notes         String?  @db.Text
+
+  @@unique([prestartId, documentId, dayType])
+  @@map("prestart_meeting_jobs")
+}
+
+enum DayType {
+  YESTERDAY
+  TODAY
+}
+
+// ============================================
+// JOBMAN SYNC LOG
+// ============================================
+
+model JobmanSyncLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type") // lead, quote, job, contact
+  entityId    String   @map("entity_id")   // Jobman UUID
+  action      String   // created, updated, synced
+  direction   String   // inbound (from Jobman), outbound (to Jobman)
+  payload     Json?    // Data that was synced
+  status      String   // success, failed
+  errorMessage String? @map("error_message")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("jobman_sync_log")
+}
