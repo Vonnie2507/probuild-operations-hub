@@ -103,7 +103,9 @@ export default function DocumentDetail() {
       setSearchingContacts(true);
       try {
         const { data } = await jobmanApi.getContacts({ search: contactSearch });
-        setContactResults(data.data || data || []);
+        // Handle nested response: { contacts: { data: [...] } }
+        const contacts = data?.contacts?.data || data?.data || data || [];
+        setContactResults(contacts);
         setShowContactDropdown(true);
       } catch (err) {
         console.error('Failed to search contacts:', err);
@@ -136,10 +138,10 @@ export default function DocumentDetail() {
   function selectContact(contact) {
     setDocument((prev) => ({
       ...prev,
-      customerName: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
-      customerEmail: contact.email || '',
+      customerName: contact.name || contact.primary_contact_person_name || '',
+      customerEmail: contact.email || contact.primary_contact_person_email || '',
       customerPhone: contact.phone || '',
-      customerMobile: contact.mobile || '',
+      customerMobile: contact.mobile || contact.primary_contact_person_mobile || '',
     }));
     setContactSearch('');
     setShowContactDropdown(false);
@@ -333,11 +335,13 @@ export default function DocumentDetail() {
                       </div>
                       <div>
                         <div className="font-medium text-gray-900">
-                          {contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim()}
+                          {contact.name || contact.primary_contact_person_name || 'Unknown'}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {contact.email && <span>{contact.email}</span>}
-                          {contact.email && contact.mobile && <span> • </span>}
+                          {(contact.email || contact.primary_contact_person_email) && (
+                            <span>{contact.email || contact.primary_contact_person_email}</span>
+                          )}
+                          {(contact.email || contact.primary_contact_person_email) && contact.mobile && <span> • </span>}
                           {contact.mobile && <span>{contact.mobile}</span>}
                         </div>
                       </div>
