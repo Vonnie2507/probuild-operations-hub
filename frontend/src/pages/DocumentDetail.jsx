@@ -86,6 +86,8 @@ export default function DocumentDetail() {
   const [searchingContacts, setSearchingContacts] = useState(false);
   const [allContacts, setAllContacts] = useState([]); // Cache all contacts
   const [contactsLoaded, setContactsLoaded] = useState(false);
+  const [sameAsContactAddress, setSameAsContactAddress] = useState(true);
+  const [contactAddress, setContactAddress] = useState(null); // Store contact's address
   const contactSearchRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -168,16 +170,64 @@ export default function DocumentDetail() {
   }, []);
 
   function selectContact(contact) {
+    // Get address from contact (prefer street address, fall back to postal)
+    const address = {
+      full: contact.street_address || contact.postal_address || '',
+      line1: contact.street_address_line1 || contact.postal_address_line1 || '',
+      line2: contact.street_address_line2 || contact.postal_address_line2 || '',
+      city: contact.street_address_city || contact.postal_address_city || '',
+      state: contact.street_address_region || contact.postal_address_region || '',
+      postcode: contact.street_address_postal_code || contact.postal_address_postal_code || '',
+    };
+
+    // Store contact address for toggle
+    setContactAddress(address);
+    setSameAsContactAddress(true);
+
     setDocument((prev) => ({
       ...prev,
       customerName: contact.name || contact.primary_contact_person_name || '',
       customerEmail: contact.email || contact.primary_contact_person_email || '',
       customerPhone: contact.phone || '',
       customerMobile: contact.mobile || contact.primary_contact_person_mobile || '',
+      // Auto-fill site address from contact
+      siteAddress: address.full,
+      siteAddressLine1: address.line1,
+      siteAddressLine2: address.line2,
+      siteCity: address.city,
+      siteState: address.state || 'WA',
+      sitePostcode: address.postcode,
     }));
     setContactSearch('');
     setShowContactDropdown(false);
     setSuccess(false);
+  }
+
+  function handleSameAddressToggle(checked) {
+    setSameAsContactAddress(checked);
+    if (checked && contactAddress) {
+      // Copy contact address to site address
+      setDocument((prev) => ({
+        ...prev,
+        siteAddress: contactAddress.full,
+        siteAddressLine1: contactAddress.line1,
+        siteAddressLine2: contactAddress.line2,
+        siteCity: contactAddress.city,
+        siteState: contactAddress.state || 'WA',
+        sitePostcode: contactAddress.postcode,
+      }));
+    } else if (!checked) {
+      // Clear site address for manual entry
+      setDocument((prev) => ({
+        ...prev,
+        siteAddress: '',
+        siteAddressLine1: '',
+        siteAddressLine2: '',
+        siteCity: '',
+        siteState: 'WA',
+        sitePostcode: '',
+      }));
+    }
   }
 
   async function fetchDocument() {
@@ -440,86 +490,112 @@ export default function DocumentDetail() {
 
         {/* Site Address */}
         <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Site Address</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Address
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Site Address</h2>
+            {contactAddress && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sameAsContactAddress}
+                  onChange={(e) => handleSameAddressToggle(e.target.checked)}
+                  className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500"
+                />
+                <span className="text-sm text-gray-600">Same as contact address</span>
               </label>
-              <input
-                type="text"
-                value={document.siteAddress || ''}
-                onChange={(e) => handleChange('siteAddress', e.target.value)}
-                placeholder="123 Main St, Brisbane QLD 4000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
+            )}
+          </div>
+
+          {/* Show contact address summary when checked */}
+          {sameAsContactAddress && contactAddress && contactAddress.full && (
+            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">Using contact address:</span> {contactAddress.full || `${contactAddress.line1}, ${contactAddress.city} ${contactAddress.state} ${contactAddress.postcode}`}
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 1
-              </label>
-              <input
-                type="text"
-                value={document.siteAddressLine1 || ''}
-                onChange={(e) => handleChange('siteAddressLine1', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 2
-              </label>
-              <input
-                type="text"
-                value={document.siteAddressLine2 || ''}
-                onChange={(e) => handleChange('siteAddressLine2', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                City
-              </label>
-              <input
-                type="text"
-                value={document.siteCity || ''}
-                onChange={(e) => handleChange('siteCity', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+          )}
+
+          {/* Show address fields when unchecked or no contact selected */}
+          {(!sameAsContactAddress || !contactAddress) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  State
-                </label>
-                <select
-                  value={document.siteState || 'QLD'}
-                  onChange={(e) => handleChange('siteState', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                >
-                  <option value="QLD">QLD</option>
-                  <option value="NSW">NSW</option>
-                  <option value="VIC">VIC</option>
-                  <option value="SA">SA</option>
-                  <option value="WA">WA</option>
-                  <option value="TAS">TAS</option>
-                  <option value="NT">NT</option>
-                  <option value="ACT">ACT</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Postcode
+                  Full Address
                 </label>
                 <input
                   type="text"
-                  value={document.sitePostcode || ''}
-                  onChange={(e) => handleChange('sitePostcode', e.target.value)}
+                  value={document.siteAddress || ''}
+                  onChange={(e) => handleChange('siteAddress', e.target.value)}
+                  placeholder="123 Main St, Perth WA 6000"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
+                  value={document.siteAddressLine1 || ''}
+                  onChange={(e) => handleChange('siteAddressLine1', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={document.siteAddressLine2 || ''}
+                  onChange={(e) => handleChange('siteAddressLine2', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={document.siteCity || ''}
+                  onChange={(e) => handleChange('siteCity', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    State
+                  </label>
+                  <select
+                    value={document.siteState || 'WA'}
+                    onChange={(e) => handleChange('siteState', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  >
+                    <option value="WA">WA</option>
+                    <option value="QLD">QLD</option>
+                    <option value="NSW">NSW</option>
+                    <option value="VIC">VIC</option>
+                    <option value="SA">SA</option>
+                    <option value="TAS">TAS</option>
+                    <option value="NT">NT</option>
+                    <option value="ACT">ACT</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Postcode
+                  </label>
+                  <input
+                    type="text"
+                    value={document.sitePostcode || ''}
+                    onChange={(e) => handleChange('sitePostcode', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Site Access */}
