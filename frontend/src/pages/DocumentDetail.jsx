@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -13,8 +13,10 @@ import {
   Zap,
   Droplets,
   FileText,
+  Search,
+  User,
 } from 'lucide-react';
-import { documentsApi } from '../api';
+import { documentsApi, jobmanApi } from '../api';
 import { format } from 'date-fns';
 
 const statusOptions = [
@@ -77,11 +79,72 @@ export default function DocumentDetail() {
     productionNotes: '',
   });
 
+  // Contact search state
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactResults, setContactResults] = useState([]);
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [searchingContacts, setSearchingContacts] = useState(false);
+  const contactSearchRef = useRef(null);
+  const dropdownRef = useRef(null);
+
   useEffect(() => {
     if (!isNew) {
       fetchDocument();
     }
   }, [id]);
+
+  // Search contacts when typing
+  useEffect(() => {
+    const searchContacts = async () => {
+      if (contactSearch.length < 2) {
+        setContactResults([]);
+        return;
+      }
+      setSearchingContacts(true);
+      try {
+        const { data } = await jobmanApi.getContacts({ search: contactSearch });
+        setContactResults(data.data || data || []);
+        setShowContactDropdown(true);
+      } catch (err) {
+        console.error('Failed to search contacts:', err);
+        setContactResults([]);
+      } finally {
+        setSearchingContacts(false);
+      }
+    };
+
+    const debounce = setTimeout(searchContacts, 300);
+    return () => clearTimeout(debounce);
+  }, [contactSearch]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        contactSearchRef.current &&
+        !contactSearchRef.current.contains(event.target)
+      ) {
+        setShowContactDropdown(false);
+      }
+    }
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function selectContact(contact) {
+    setDocument((prev) => ({
+      ...prev,
+      customerName: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+      customerEmail: contact.email || '',
+      customerPhone: contact.phone || '',
+      customerMobile: contact.mobile || '',
+    }));
+    setContactSearch('');
+    setShowContactDropdown(false);
+    setSuccess(false);
+  }
 
   async function fetchDocument() {
     try {
@@ -233,6 +296,63 @@ export default function DocumentDetail() {
         {/* Customer Information */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Customer Information</h2>
+
+          {/* Contact Search */}
+          <div className="mb-4 relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <Search className="w-4 h-4 inline mr-1" /> Search Jobman Contacts
+            </label>
+            <input
+              ref={contactSearchRef}
+              type="text"
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              placeholder="Type to search contacts..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            />
+            {searchingContacts && (
+              <div className="absolute right-3 top-9">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+              </div>
+            )}
+            {showContactDropdown && contactResults.length > 0 && (
+              <div
+                ref={dropdownRef}
+                className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
+              >
+                {contactResults.map((contact) => (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() => selectContact(contact)}
+                    className="w-full px-4 py-3 text-left hover:bg-orange-50 border-b border-gray-100 last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-gray-100 p-2 rounded-full">
+                        <User className="w-4 h-4 text-gray-500" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim()}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {contact.email && <span>{contact.email}</span>}
+                          {contact.email && contact.mobile && <span> • </span>}
+                          {contact.mobile && <span>{contact.mobile}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {showContactDropdown && contactSearch.length >= 2 && contactResults.length === 0 && !searchingContacts && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                No contacts found
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
