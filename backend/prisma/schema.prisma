@@ -348,6 +348,72 @@ enum DayType {
 }
 
 // ============================================
+// FORM TEMPLATES
+// ============================================
+
+model FormTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  type        FormType @default(CUSTOM)
+
+  // The HTML template with {{ variable }} placeholders
+  htmlTemplate String  @map("html_template") @db.Text
+
+  // CSS styles (optional)
+  cssStyles    String? @map("css_styles") @db.Text
+
+  // Active/inactive
+  isActive    Boolean  @default(true) @map("is_active")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Form submissions using this template
+  submissions FormSubmission[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("form_templates")
+}
+
+enum FormType {
+  SITE_ASSESSMENT
+  RISK_ASSESSMENT
+  PRESTART_CHECKLIST
+  COMPLETION_FORM
+  SIGNOFF_FORM
+  CUSTOM
+}
+
+// Filled-out form submissions
+model FormSubmission {
+  id          String   @id @default(uuid())
+  templateId  String   @map("template_id")
+  template    FormTemplate @relation(fields: [templateId], references: [id])
+
+  // Link to document/job (optional)
+  documentId  String?  @map("document_id")
+
+  // The rendered HTML with data filled in
+  renderedHtml String  @map("rendered_html") @db.Text
+
+  // Form responses as JSON
+  responses   Json     @default("{}")
+
+  // Metadata
+  submittedBy String?  @map("submitted_by")
+  submittedAt DateTime @default(now()) @map("submitted_at")
+
+  // Signature (if required)
+  signatureUrl String? @map("signature_url")
+
+  @@index([templateId])
+  @@index([documentId])
+  @@map("form_submissions")
+}
+
+// ============================================
 // JOBMAN SYNC LOG
 // ============================================
 

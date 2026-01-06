@@ -16,6 +16,7 @@ const jobmanRoutes = require('./routes/jobman');
 const webhooksRoutes = require('./routes/webhooks');
 const filesRoutes = require('./routes/files');
 const authRoutes = require('./routes/auth');
+const templatesRoutes = require('./routes/templates');
 
 // Initialise Prisma
 const prisma = new PrismaClient();
@@ -69,6 +70,7 @@ app.use('/api/prestart', prestartRoutes);
 app.use('/api/jobman', jobmanRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/files', filesRoutes);
+app.use('/api/templates', templatesRoutes);
 
 // ============================================
 // ERROR HANDLING
@@ -130,6 +132,7 @@ async function start() {
 ║   • /api/jobman     - Jobman API proxy                ║
 ║   • /api/files      - File uploads                    ║
 ║   • /api/webhooks   - Webhook receivers               ║
+║   • /api/templates  - Form templates                  ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
       `);

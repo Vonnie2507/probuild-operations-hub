@@ -50,4 +50,17 @@ export const filesApi = {
   delete: (fileId) => api.delete(`/files/${fileId}`),
 };
 
+// Form Templates API
+export const templatesApi = {
+  getAll: (params = {}) => api.get('/templates', { params }),
+  getById: (id) => api.get(`/templates/${id}`),
+  create: (data) => api.post('/templates', data),
+  update: (id, data) => api.put(`/templates/${id}`, data),
+  delete: (id) => api.delete(`/templates/${id}`),
+  getVariables: () => api.get('/templates/variables'),
+  preview: (id, data = {}) => api.post(`/templates/${id}/preview`, { data }),
+  previewRaw: (htmlTemplate, cssStyles, data = {}) =>
+    api.post('/templates/preview-raw', { htmlTemplate, cssStyles, data }),
+};
+
 export default api;
