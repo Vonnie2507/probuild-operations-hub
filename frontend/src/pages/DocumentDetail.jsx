@@ -84,6 +84,8 @@ export default function DocumentDetail() {
   const [contactResults, setContactResults] = useState([]);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [searchingContacts, setSearchingContacts] = useState(false);
+  const [allContacts, setAllContacts] = useState([]); // Cache all contacts
+  const [contactsLoaded, setContactsLoaded] = useState(false);
   const contactSearchRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -91,33 +93,63 @@ export default function DocumentDetail() {
     if (!isNew) {
       fetchDocument();
     }
+    // Preload contacts for fast search
+    loadAllContacts();
   }, [id]);
 
-  // Search contacts when typing
-  useEffect(() => {
-    const searchContacts = async () => {
-      if (contactSearch.length < 2) {
-        setContactResults([]);
-        return;
-      }
-      setSearchingContacts(true);
-      try {
-        const { data } = await jobmanApi.getContacts({ search: contactSearch });
-        // Handle nested response: { contacts: { data: [...] } }
-        const contacts = data?.contacts?.data || data?.data || data || [];
-        setContactResults(contacts);
-        setShowContactDropdown(true);
-      } catch (err) {
-        console.error('Failed to search contacts:', err);
-        setContactResults([]);
-      } finally {
-        setSearchingContacts(false);
-      }
-    };
+  // Preload all contacts on mount for instant search
+  async function loadAllContacts() {
+    try {
+      const { data } = await jobmanApi.getContacts({ per_page: 500 });
+      const contacts = data?.contacts?.data || data?.data || data || [];
+      setAllContacts(contacts);
+      setContactsLoaded(true);
+    } catch (err) {
+      console.error('Failed to preload contacts:', err);
+    }
+  }
 
-    const debounce = setTimeout(searchContacts, 300);
-    return () => clearTimeout(debounce);
-  }, [contactSearch]);
+  // Filter contacts locally for instant results
+  useEffect(() => {
+    if (contactSearch.length < 2) {
+      setContactResults([]);
+      setShowContactDropdown(false);
+      return;
+    }
+
+    const searchLower = contactSearch.toLowerCase();
+
+    if (contactsLoaded && allContacts.length > 0) {
+      // Instant local filter
+      const filtered = allContacts.filter(contact => {
+        const name = (contact.name || contact.primary_contact_person_name || '').toLowerCase();
+        const email = (contact.email || contact.primary_contact_person_email || '').toLowerCase();
+        return name.includes(searchLower) || email.includes(searchLower);
+      }).slice(0, 10); // Limit to 10 results
+
+      setContactResults(filtered);
+      setShowContactDropdown(true);
+    } else {
+      // Fallback to API search if contacts not loaded yet
+      setSearchingContacts(true);
+      const searchContacts = async () => {
+        try {
+          const { data } = await jobmanApi.getContacts({ search: contactSearch });
+          const contacts = data?.contacts?.data || data?.data || data || [];
+          setContactResults(contacts);
+          setShowContactDropdown(true);
+        } catch (err) {
+          console.error('Failed to search contacts:', err);
+          setContactResults([]);
+        } finally {
+          setSearchingContacts(false);
+        }
+      };
+
+      const debounce = setTimeout(searchContacts, 150);
+      return () => clearTimeout(debounce);
+    }
+  }, [contactSearch, contactsLoaded, allContacts]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -309,7 +341,7 @@ export default function DocumentDetail() {
               type="text"
               value={contactSearch}
               onChange={(e) => setContactSearch(e.target.value)}
-              placeholder="Type to search contacts..."
+              placeholder={contactsLoaded ? `Search ${allContacts.length} contacts...` : "Loading contacts..."}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             />
             {searchingContacts && (
