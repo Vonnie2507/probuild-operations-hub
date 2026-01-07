@@ -74,6 +74,7 @@ export default function Templates() {
     }
 
     try {
+      console.log('Saving template:', { editingTemplate, formData });
       if (editingTemplate) {
         await templatesApi.update(editingTemplate.id, formData);
       } else {
@@ -83,7 +84,8 @@ export default function Templates() {
       resetForm();
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Failed to save template');
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
+      alert(`Failed to save template: ${errorMsg}`);
     }
   }
 
