@@ -51,7 +51,7 @@ export default function PrestartDetail() {
     try {
       const [meetingRes, docsRes] = await Promise.all([
         prestartApi.getById(id),
-        documentsApi.getAll({ status: 'IN_PROGRESS,SCHEDULED', limit: 50 }),
+        documentsApi.getAll({ limit: 50 }),
       ]);
       // Backend returns { meeting } so extract it
       const meetingData = meetingRes.data.meeting || meetingRes.data;
