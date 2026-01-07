@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
@@ -15,8 +15,9 @@ import {
   FileText,
   Search,
   User,
+  Code,
 } from 'lucide-react';
-import { documentsApi, jobmanApi } from '../api';
+import { documentsApi, jobmanApi, templatesApi } from '../api';
 import { format } from 'date-fns';
 
 const statusOptions = [
@@ -33,12 +34,17 @@ const statusOptions = [
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isNew = id === 'new';
+  const templateId = searchParams.get('template');
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
+  const [renderedTemplate, setRenderedTemplate] = useState('');
 
   const [document, setDocument] = useState({
     customerName: '',
@@ -95,9 +101,52 @@ export default function DocumentDetail() {
     if (!isNew) {
       fetchDocument();
     }
+    // Load template if specified
+    if (templateId) {
+      loadTemplate(templateId);
+    }
     // Preload contacts for fast search
     loadAllContacts();
-  }, [id]);
+  }, [id, templateId]);
+
+  async function loadTemplate(tplId) {
+    try {
+      const { data } = await templatesApi.getById(tplId);
+      setSelectedTemplate(data);
+    } catch (err) {
+      console.error('Failed to load template:', err);
+    }
+  }
+
+  async function renderTemplatePreview() {
+    if (!selectedTemplate) return;
+    try {
+      // Build context from current document data
+      const context = {
+        job: {
+          number: document.jobNumber || 'J-0000',
+          site_address: document.siteAddress || '',
+        },
+        job_contact: {
+          name: document.customerName || '',
+          email: document.customerEmail || '',
+          phone: document.customerPhone || '',
+          mobile: document.customerMobile || '',
+        },
+        date: {
+          current: format(new Date(), 'dd/MM/yyyy'),
+          year: new Date().getFullYear().toString(),
+        },
+      };
+
+      const { data } = await templatesApi.preview(selectedTemplate.id, context);
+      setRenderedTemplate(data.renderedHtml);
+      setShowTemplatePreview(true);
+    } catch (err) {
+      console.error('Failed to render template:', err);
+      alert('Failed to render template preview');
+    }
+  }
 
   // Preload all contacts on mount for instant search
   async function loadAllContacts() {
@@ -341,6 +390,31 @@ export default function DocumentDetail() {
           </button>
         </div>
       </div>
+
+      {/* Template Info Bar */}
+      {selectedTemplate && (
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-100 p-2 rounded-lg">
+                <Code className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">Using Template: {selectedTemplate.name}</p>
+                <p className="text-sm text-gray-500">{selectedTemplate.description || selectedTemplate.type.replace('_', ' ')}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={renderTemplatePreview}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Preview Form
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Status Bar */}
       <div className="bg-white rounded-xl shadow p-4">
@@ -968,6 +1042,48 @@ export default function DocumentDetail() {
           </button>
         </div>
       </form>
+
+      {/* Template Preview Modal */}
+      {showTemplatePreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">Form Preview: {selectedTemplate?.name}</h2>
+                <p className="text-sm text-gray-500">Preview with current document data</p>
+              </div>
+              <button
+                onClick={() => setShowTemplatePreview(false)}
+                className="p-2 text-gray-400 hover:text-gray-600"
+              >
+                <span className="text-xl">&times;</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 bg-gray-100">
+              <div className="bg-white shadow-lg mx-auto max-w-3xl">
+                <div
+                  className="p-8"
+                  dangerouslySetInnerHTML={{ __html: renderedTemplate }}
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowTemplatePreview(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+              >
+                Print Form
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

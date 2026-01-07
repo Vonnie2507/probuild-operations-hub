@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, FileText, ChevronRight } from 'lucide-react';
-import { documentsApi } from '../api';
+import { Plus, Search, Filter, FileText, ChevronRight, X, Code } from 'lucide-react';
+import { documentsApi, templatesApi } from '../api';
 import { format } from 'date-fns';
 
 const statusColors = {
@@ -33,6 +33,9 @@ export default function Documents() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,6 +67,28 @@ export default function Documents() {
     fetchDocuments();
   }
 
+  async function openTemplateModal() {
+    setShowTemplateModal(true);
+    setTemplatesLoading(true);
+    try {
+      const { data } = await templatesApi.getAll();
+      setTemplates(data);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }
+
+  function selectTemplate(templateId) {
+    setShowTemplateModal(false);
+    if (templateId) {
+      navigate(`/documents/new?template=${templateId}`);
+    } else {
+      navigate('/documents/new');
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -74,13 +99,13 @@ export default function Documents() {
             {pagination.total} document{pagination.total !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link
-          to="/documents/new"
+        <button
+          onClick={openTemplateModal}
           className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Document
-        </Link>
+        </button>
       </div>
 
       {/* Filters */}
@@ -207,6 +232,79 @@ export default function Documents() {
           >
             Next
           </button>
+        </div>
+      )}
+
+      {/* Template Selection Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">Choose a Template</h2>
+                <p className="text-sm text-gray-500">Select a form template or start blank</p>
+              </div>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {templatesLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Blank Document Option */}
+                  <button
+                    onClick={() => selectTemplate(null)}
+                    className="p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-orange-400 hover:bg-orange-50 transition-all text-left group"
+                  >
+                    <div className="bg-gray-100 group-hover:bg-orange-100 p-3 rounded-lg w-fit mb-3">
+                      <FileText className="w-6 h-6 text-gray-500 group-hover:text-orange-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Blank Document</h3>
+                    <p className="text-sm text-gray-500 mt-1">Start from scratch</p>
+                  </button>
+
+                  {/* Template Options */}
+                  {templates.map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => selectTemplate(template.id)}
+                      className="p-6 border border-gray-200 rounded-xl hover:border-orange-400 hover:bg-orange-50 transition-all text-left group"
+                    >
+                      <div className="bg-orange-100 p-3 rounded-lg w-fit mb-3">
+                        <Code className="w-6 h-6 text-orange-600" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900">{template.name}</h3>
+                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                        {template.description || 'Custom template'}
+                      </p>
+                      <span className="inline-block mt-2 text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                        {template.type.replace('_', ' ')}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!templatesLoading && templates.length === 0 && (
+                <p className="text-center text-gray-500 mt-4">
+                  No templates created yet.{' '}
+                  <Link to="/templates" className="text-orange-500 hover:underline">
+                    Create your first template
+                  </Link>
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
