@@ -111,11 +111,39 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================
 
+async function ensureAdminUser() {
+  const bcrypt = require('bcryptjs');
+
+  // Check if admin user exists
+  const adminExists = await prisma.user.findFirst({
+    where: { role: 'ADMIN' }
+  });
+
+  if (!adminExists) {
+    console.log('🌱 No admin user found, creating default admin...');
+    const hashedPassword = await bcrypt.hash('probuild123', 10);
+
+    await prisma.user.create({
+      data: {
+        email: 'admin@probuild.com.au',
+        name: 'Probuild Admin',
+        role: 'ADMIN',
+        password: hashedPassword,
+        isActive: true,
+      }
+    });
+    console.log('✅ Default admin user created (admin@probuild.com.au)');
+  }
+}
+
 async function start() {
   try {
     // Test database connection
     await prisma.$connect();
     console.log('✅ Database connected');
+
+    // Ensure admin user exists
+    await ensureAdminUser();
 
     // Start server
     app.listen(PORT, () => {
