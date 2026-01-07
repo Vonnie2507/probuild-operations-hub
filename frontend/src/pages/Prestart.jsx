@@ -19,7 +19,10 @@ export default function Prestart() {
       // Check for today's meeting
       try {
         const { data } = await prestartApi.getToday();
-        setTodayMeeting(data);
+        // Only set if it has an actual ID (exists in database)
+        if (data.meeting && data.meeting.id) {
+          setTodayMeeting(data.meeting);
+        }
       } catch (err) {
         // No meeting today - that's okay
       }
@@ -40,9 +43,12 @@ export default function Prestart() {
         meetingDate: new Date().toISOString(),
         staffPresent: [],
       });
-      navigate(`/prestart/${data.id}`);
+      // Backend returns { meeting } so extract it
+      const meeting = data.meeting || data;
+      navigate(`/prestart/${meeting.id}`);
     } catch (error) {
       console.error('Failed to create meeting:', error);
+      alert('Failed to create meeting. Please try again.');
     }
   }
 

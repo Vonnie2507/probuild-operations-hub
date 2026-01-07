@@ -47,7 +47,8 @@ export default function PrestartDetail() {
         prestartApi.getById(id),
         documentsApi.getAll({ status: 'IN_PROGRESS,SCHEDULED', limit: 50 }),
       ]);
-      setMeeting(meetingRes.data);
+      // Backend returns { meeting } so extract it
+      setMeeting(meetingRes.data.meeting || meetingRes.data);
       setDocuments(docsRes.data.documents || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
