@@ -203,33 +203,60 @@ router.get('/jobman-data',
         console.warn('Could not fetch Jobman data:', e.message);
       }
 
-      // Build pre-fill data for the form
+      // Build pre-fill data for the form - field names match template placeholders
       const prefillData = {
-        meeting_date: today.toISOString().split('T')[0],
-        meeting_time: '06:00',
+        // Meta fields - match template {{ field_name }} placeholders
+        todays_date: today.toISOString().split('T')[0],
+        meeting_start_time: '06:00',
+        meeting_end_time: '',
+        run_by: staff[0]?.name || '', // Default to first staff member
         staff_present: staff.map(s => s.name).join(', '),
 
         // Yesterday's jobs - Installer 1
         installer1_name: yesterdaysJobs[0]?.members[0]?.name || '',
         installer1_yesterday_job: yesterdaysJobs[0]?.site_address || yesterdaysJobs[0]?.site_address_line1 || '',
         installer1_stage: yesterdaysJobs[0]?.task?.name || '',
+        installer1_yesterday_notes: '',
 
         // Yesterday's jobs - Installer 2
         installer2_name: yesterdaysJobs[1]?.members[0]?.name || (yesterdaysJobs[0]?.members[1]?.name || ''),
         installer2_yesterday_job: yesterdaysJobs[1]?.site_address || (yesterdaysJobs[0]?.members[1] ? yesterdaysJobs[0]?.site_address : '') || '',
         installer2_stage: yesterdaysJobs[1]?.task?.name || '',
+        installer2_yesterday_notes: '',
+
+        // Yesterday's jobs - Installer 3
+        installer3_name: yesterdaysJobs[2]?.members[0]?.name || '',
+        installer3_yesterday_job: yesterdaysJobs[2]?.site_address || yesterdaysJobs[2]?.site_address_line1 || '',
+        installer3_stage: yesterdaysJobs[2]?.task?.name || '',
+        installer3_yesterday_notes: '',
 
         // Today's jobs - Installer 1
         installer1_job1_address: todaysJobs[0]?.site_address || todaysJobs[0]?.site_address_line1 || '',
         installer1_job1_scope: todaysJobs[0]?.description || todaysJobs[0]?.task?.name || '',
-        installer1_job2_address: todaysJobs.length > 2 ? (todaysJobs[2]?.site_address || '') : '',
-        installer1_job2_scope: todaysJobs.length > 2 ? (todaysJobs[2]?.description || '') : '',
+        installer1_job2_address: todaysJobs.length > 3 ? (todaysJobs[3]?.site_address || '') : '',
+        installer1_job2_scope: todaysJobs.length > 3 ? (todaysJobs[3]?.description || '') : '',
+        installer1_special_notes: '',
 
         // Today's jobs - Installer 2
         installer2_job1_address: todaysJobs[1]?.site_address || todaysJobs[1]?.site_address_line1 || '',
         installer2_job1_scope: todaysJobs[1]?.description || todaysJobs[1]?.task?.name || '',
-        installer2_job2_address: todaysJobs.length > 3 ? (todaysJobs[3]?.site_address || '') : '',
-        installer2_job2_scope: todaysJobs.length > 3 ? (todaysJobs[3]?.description || '') : '',
+        installer2_job2_address: todaysJobs.length > 4 ? (todaysJobs[4]?.site_address || '') : '',
+        installer2_job2_scope: todaysJobs.length > 4 ? (todaysJobs[4]?.description || '') : '',
+        installer2_special_notes: '',
+
+        // Today's jobs - Installer 3
+        installer3_job1_address: todaysJobs[2]?.site_address || todaysJobs[2]?.site_address_line1 || '',
+        installer3_job1_scope: todaysJobs[2]?.description || todaysJobs[2]?.task?.name || '',
+        installer3_job2_address: todaysJobs.length > 5 ? (todaysJobs[5]?.site_address || '') : '',
+        installer3_job2_scope: todaysJobs.length > 5 ? (todaysJobs[5]?.description || '') : '',
+        installer3_special_notes: '',
+
+        // Safety & other sections (manual entry)
+        safety_topic: '',
+        safety_notes: '',
+        challenge_description: '',
+        win_description: '',
+        compliance_notes: '',
       };
 
       res.json({
