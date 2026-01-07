@@ -347,6 +347,19 @@ export default function PrestartDetail() {
                   }
                   document.body.addEventListener('change', sendFormData);
                   document.body.addEventListener('input', sendFormData);
+
+                  // Hide empty installer cards
+                  function hideEmptyInstallerCards() {
+                    document.querySelectorAll('.installer-card, .compliance-card').forEach(card => {
+                      const headerInput = card.querySelector('.installer-header input[data-field*="name"]');
+                      if (headerInput && !headerInput.value.trim()) {
+                        card.style.display = 'none';
+                      }
+                    });
+                    resizeFrame();
+                  }
+                  window.addEventListener('load', hideEmptyInstallerCards);
+                  setTimeout(hideEmptyInstallerCards, 200);
                 </script>
               </body>
               </html>
