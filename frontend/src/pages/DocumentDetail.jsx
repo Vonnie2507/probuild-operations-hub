@@ -57,6 +57,17 @@ export default function DocumentDetail() {
     init();
   }, [id, templateId, isNew]);
 
+  // Listen for form data from iframe
+  useEffect(() => {
+    function handleMessage(event) {
+      if (event.data?.type === 'formData') {
+        setFormData(event.data.data);
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Convert template HTML to fillable form by replacing {{ variables }} with inputs
   function convertToFillableForm(html) {
     if (!html) return '';
@@ -98,58 +109,22 @@ export default function DocumentDetail() {
     return converted;
   }
 
-  // Handle input changes via event delegation
-  function handleFormChange(e) {
-    const target = e.target;
-    const fieldName = target.dataset.field;
-    if (!fieldName) return;
-
-    let value;
-    if (target.type === 'checkbox') {
-      value = target.checked;
-    } else {
-      value = target.value;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
-  }
-
-  // Collect all form data before save
-  function collectFormData() {
-    if (!formRef.current) return formData;
-
-    const data = { ...formData };
-    const inputs = formRef.current.querySelectorAll('[data-field]');
-    inputs.forEach(input => {
-      const fieldName = input.dataset.field;
-      if (input.type === 'checkbox') {
-        data[fieldName] = input.checked;
-      } else {
-        data[fieldName] = input.value;
-      }
-    });
-    return data;
-  }
-
   async function handleSave() {
     setSaving(true);
     setError(null);
 
     try {
-      const collectedData = collectFormData();
+      // formData is updated via postMessage from iframe
 
       const payload = {
         templateId: selectedTemplate?.id || templateId,
         templateName: selectedTemplate?.name,
-        formData: collectedData,
+        formData: formData,
         // Extract common fields for document listing
-        customerName: collectedData['job_contact.name'] || collectedData['contact.name'] || collectedData['customer_name'] || 'Unnamed',
-        customerEmail: collectedData['job_contact.email'] || collectedData['contact.email'] || '',
-        customerPhone: collectedData['job_contact.phone'] || collectedData['contact.phone'] || '',
-        siteAddress: collectedData['job.site_address'] || collectedData['site_address'] || '',
+        customerName: formData['job_contact.name'] || formData['contact.name'] || formData['customer_name'] || formData['client_name'] || 'Unnamed',
+        customerEmail: formData['job_contact.email'] || formData['contact.email'] || formData['email'] || '',
+        customerPhone: formData['job_contact.phone'] || formData['contact.phone'] || formData['phone'] || '',
+        siteAddress: formData['job.site_address'] || formData['site_address'] || formData['address'] || '',
         status: 'LEAD',
       };
 
@@ -257,18 +232,71 @@ export default function DocumentDetail() {
       {/* Form Content - Rendered from Template */}
       <div
         ref={formRef}
-        className="bg-white rounded-xl shadow p-8 print:shadow-none"
-        onChange={handleFormChange}
+        className="bg-white rounded-xl shadow p-8 print:shadow-none overflow-hidden"
       >
-        {/* Inject template CSS */}
-        {selectedTemplate?.cssStyles && (
-          <style>{selectedTemplate.cssStyles}</style>
-        )}
+        {/* Render the fillable form in isolated container */}
+        <iframe
+          srcDoc={`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; padding: 0; margin: 0; }
+                input, textarea, select {
+                  border: 1px solid #d1d5db;
+                  border-radius: 0.5rem;
+                  padding: 0.5rem 0.75rem;
+                  width: 100%;
+                  box-sizing: border-box;
+                }
+                input:focus, textarea:focus, select:focus {
+                  outline: none;
+                  border-color: #f97316;
+                  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+                }
+                ${selectedTemplate?.cssStyles || ''}
+              </style>
+            </head>
+            <body>
+              ${fillableHtml}
+              <script>
+                // Send form data to parent on change
+                document.body.addEventListener('change', (e) => {
+                  const inputs = document.querySelectorAll('[data-field]');
+                  const data = {};
+                  inputs.forEach(input => {
+                    if (input.type === 'checkbox') {
+                      data[input.dataset.field] = input.checked;
+                    } else {
+                      data[input.dataset.field] = input.value;
+                    }
+                  });
+                  window.parent.postMessage({ type: 'formData', data }, '*');
+                });
 
-        {/* Render the fillable form */}
-        <div
-          className="template-form"
-          dangerouslySetInnerHTML={{ __html: fillableHtml }}
+                // Also send on input for immediate updates
+                document.body.addEventListener('input', (e) => {
+                  const inputs = document.querySelectorAll('[data-field]');
+                  const data = {};
+                  inputs.forEach(input => {
+                    if (input.type === 'checkbox') {
+                      data[input.dataset.field] = input.checked;
+                    } else {
+                      data[input.dataset.field] = input.value;
+                    }
+                  });
+                  window.parent.postMessage({ type: 'formData', data }, '*');
+                });
+              </script>
+            </body>
+            </html>
+          `}
+          className="w-full border-0"
+          style={{ minHeight: '800px', height: 'auto' }}
+          title="Form"
         />
       </div>
 
