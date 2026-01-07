@@ -14,8 +14,9 @@ import {
   Trophy,
   Shield,
   Mic,
+  FileText,
 } from 'lucide-react';
-import { prestartApi, documentsApi } from '../api';
+import { prestartApi, documentsApi, templatesApi } from '../api';
 import { format } from 'date-fns';
 
 const complianceChecks = [
@@ -37,6 +38,11 @@ export default function PrestartDetail() {
   const [selectedDoc, setSelectedDoc] = useState('');
   const [newStaff, setNewStaff] = useState('');
 
+  // Template support
+  const [prestartTemplate, setPrestartTemplate] = useState(null);
+  const [formData, setFormData] = useState({});
+  const [viewMode, setViewMode] = useState('default'); // 'default' or 'template'
+
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -48,13 +54,82 @@ export default function PrestartDetail() {
         documentsApi.getAll({ status: 'IN_PROGRESS,SCHEDULED', limit: 50 }),
       ]);
       // Backend returns { meeting } so extract it
-      setMeeting(meetingRes.data.meeting || meetingRes.data);
+      const meetingData = meetingRes.data.meeting || meetingRes.data;
+      setMeeting(meetingData);
       setDocuments(docsRes.data.documents || []);
+
+      // Load form data if meeting has it
+      if (meetingData.formData) {
+        setFormData(meetingData.formData);
+      }
+
+      // Check for pre-start meeting template
+      try {
+        const templatesRes = await templatesApi.getAll();
+        const prestartTpl = templatesRes.data.find(t => t.type === 'PRESTART_MEETING' && t.isActive);
+        if (prestartTpl) {
+          setPrestartTemplate(prestartTpl);
+          setViewMode('template');
+        }
+      } catch (e) {
+        console.warn('Could not load templates:', e);
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
+  }
+
+  // Listen for form data from iframe
+  useEffect(() => {
+    function handleMessage(event) {
+      if (event.data?.type === 'formData') {
+        setFormData(event.data.data);
+      }
+      if (event.data?.type === 'resize') {
+        const iframe = document.getElementById('prestartFormFrame');
+        if (iframe) {
+          iframe.style.height = event.data.height + 'px';
+        }
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Convert template HTML to fillable form
+  function convertToFillableForm(html) {
+    if (!html) return '';
+
+    const converted = html.replace(
+      /\{\{\s*([^}]+)\s*\}\}/g,
+      (match, variable) => {
+        const fieldName = variable.trim();
+        const currentValue = formData[fieldName] || '';
+        const isTextarea = fieldName.includes('notes') || fieldName.includes('description') || fieldName.includes('details') || fieldName.includes('challenges') || fieldName.includes('wins') || fieldName.includes('safety');
+        const isCheckbox = fieldName.includes('present') || fieldName.includes('completed') || fieldName.startsWith('is_');
+        const isDate = fieldName.includes('date');
+        const isTime = fieldName.includes('time');
+
+        if (isCheckbox) {
+          return `<input type="checkbox" data-field="${fieldName}" ${currentValue ? 'checked' : ''} class="form-checkbox h-5 w-5 text-orange-500 rounded" />`;
+        }
+        if (isTextarea) {
+          return `<textarea data-field="${fieldName}" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">${currentValue}</textarea>`;
+        }
+        if (isDate) {
+          return `<input type="date" data-field="${fieldName}" value="${currentValue}" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />`;
+        }
+        if (isTime) {
+          return `<input type="time" data-field="${fieldName}" value="${currentValue}" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />`;
+        }
+
+        return `<input type="text" data-field="${fieldName}" value="${currentValue}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />`;
+      }
+    );
+
+    return converted;
   }
 
   async function handleSave() {
@@ -63,9 +138,12 @@ export default function PrestartDetail() {
       await prestartApi.update(id, {
         staffPresent: meeting.staffPresent,
         manualNotes: meeting.manualNotes,
+        formData: formData, // Save template form data
       });
+      alert('Meeting saved successfully!');
     } catch (error) {
       console.error('Failed to save:', error);
+      alert('Failed to save meeting');
     } finally {
       setSaving(false);
     }
@@ -126,6 +204,8 @@ export default function PrestartDetail() {
   const yesterdayJobs = meeting.jobs?.filter((j) => j.dayType === 'YESTERDAY') || [];
   const todayJobs = meeting.jobs?.filter((j) => j.dayType === 'TODAY') || [];
 
+  const fillableHtml = prestartTemplate ? convertToFillableForm(prestartTemplate.htmlTemplate) : '';
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -141,16 +221,133 @@ export default function PrestartDetail() {
             </p>
           </div>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50"
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Meeting'}
-        </button>
+        <div className="flex items-center gap-3">
+          {/* View Mode Toggle - only show if template exists */}
+          {prestartTemplate && (
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('template')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'template'
+                    ? 'bg-white shadow text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Form View
+              </button>
+              <button
+                onClick={() => setViewMode('default')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'default'
+                    ? 'bg-white shadow text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Jobs View
+              </button>
+            </div>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Meeting'}
+          </button>
+        </div>
       </div>
 
+      {/* Template Form View */}
+      {viewMode === 'template' && prestartTemplate && (
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <iframe
+            id="prestartFormFrame"
+            srcDoc={`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                <style>
+                  html, body {
+                    font-family: system-ui, -apple-system, sans-serif;
+                    padding: 0;
+                    margin: 0;
+                    min-height: 100%;
+                    width: 100%;
+                  }
+                  body {
+                    padding: 24px;
+                  }
+                  body > *, body > * > *, .container, .wrapper, .content, section, article, main, form, div {
+                    max-width: 100% !important;
+                    width: 100% !important;
+                    margin-left: 0 !important;
+                    margin-right: 0 !important;
+                  }
+                  input, textarea, select {
+                    border: 1px solid #d1d5db;
+                    border-radius: 0.5rem;
+                    padding: 0.5rem 0.75rem;
+                    width: 100%;
+                    box-sizing: border-box;
+                  }
+                  input:focus, textarea:focus, select:focus {
+                    outline: none;
+                    border-color: #f97316;
+                    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+                  }
+                  ${prestartTemplate.cssStyles || ''}
+                </style>
+              </head>
+              <body>
+                ${fillableHtml}
+                <script>
+                  function resizeFrame() {
+                    const height = document.body.scrollHeight;
+                    window.parent.postMessage({ type: 'resize', height: height + 50 }, '*');
+                  }
+                  window.addEventListener('load', resizeFrame);
+                  setTimeout(resizeFrame, 100);
+                  setTimeout(resizeFrame, 500);
+                  new MutationObserver(resizeFrame).observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true
+                  });
+
+                  function sendFormData() {
+                    const inputs = document.querySelectorAll('[data-field]');
+                    const data = {};
+                    inputs.forEach(input => {
+                      if (input.type === 'checkbox') {
+                        data[input.dataset.field] = input.checked;
+                      } else {
+                        data[input.dataset.field] = input.value;
+                      }
+                    });
+                    window.parent.postMessage({ type: 'formData', data }, '*');
+                  }
+                  document.body.addEventListener('change', sendFormData);
+                  document.body.addEventListener('input', sendFormData);
+                </script>
+              </body>
+              </html>
+            `}
+            className="w-full border-0"
+            style={{ minHeight: '80vh', width: '100%' }}
+            title="Pre-Start Meeting Form"
+          />
+        </div>
+      )}
+
+      {/* Default View - Staff Present */}
+      {viewMode === 'default' && (
+        <>
       {/* Staff Present */}
       <div className="bg-white rounded-xl shadow p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -394,6 +591,8 @@ export default function PrestartDetail() {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
         />
       </div>
+        </>
+      )}
 
       {/* Add Job Modal */}
       {showAddJob && (

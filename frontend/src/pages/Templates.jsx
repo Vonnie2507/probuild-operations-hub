@@ -6,6 +6,7 @@ const FORM_TYPES = [
   { value: 'SITE_ASSESSMENT', label: 'Site Assessment' },
   { value: 'RISK_ASSESSMENT', label: 'Risk Assessment' },
   { value: 'PRESTART_CHECKLIST', label: 'Pre-Start Checklist' },
+  { value: 'PRESTART_MEETING', label: 'Pre-Start Meeting' },
   { value: 'COMPLETION_FORM', label: 'Completion Form' },
   { value: 'SIGNOFF_FORM', label: 'Sign-off Form' },
   { value: 'CUSTOM', label: 'Custom' },

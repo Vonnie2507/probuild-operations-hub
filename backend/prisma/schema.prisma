@@ -304,6 +304,9 @@ model PrestartMeeting {
   // Manual notes (if any)
   manualNotes  String? @map("manual_notes") @db.Text
 
+  // Template form data (JSON for custom template fields)
+  formData     Json?   @map("form_data") @default("{}")
+
   // Jobs discussed
   jobs         PrestartMeetingJob[]
 
@@ -386,6 +389,7 @@ enum FormType {
   SITE_ASSESSMENT
   RISK_ASSESSMENT
   PRESTART_CHECKLIST
+  PRESTART_MEETING
   COMPLETION_FORM
   SIGNOFF_FORM
   CUSTOM
