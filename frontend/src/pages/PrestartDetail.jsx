@@ -276,6 +276,7 @@ export default function PrestartDetail() {
       {viewMode === 'template' && prestartTemplate && (
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <iframe
+            key={JSON.stringify(formData)}
             id="prestartFormFrame"
             srcDoc={`
               <!DOCTYPE html>
