@@ -448,4 +448,131 @@ router.get('/compliance/:date',
   }
 );
 
+// ============================================
+// GET JOBMAN DATA FOR PRE-START MEETING
+// ============================================
+
+router.get('/jobman-data',
+  async (req, res, next) => {
+    try {
+      // Get today and yesterday dates
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Fetch data from Jobman
+      let todaysJobs = [];
+      let yesterdaysJobs = [];
+      let staff = [];
+
+      try {
+        // Get all staff
+        const staffResponse = await jobman.listStaff({ limit: 50 });
+        staff = staffResponse.data || staffResponse || [];
+
+        // Get jobs for today and yesterday
+        const allJobs = await jobman.listJobs({ limit: 100 });
+        const jobs = allJobs.data || allJobs || [];
+
+        // For each job, get tasks and members to determine scheduling
+        for (const job of jobs) {
+          try {
+            const [tasksRes, membersRes] = await Promise.all([
+              jobman.getJobTasks(job.id),
+              jobman.getJobMembers(job.id)
+            ]);
+
+            const tasks = tasksRes.data || tasksRes || [];
+            const members = membersRes.data || membersRes || [];
+
+            // Check if any task is scheduled for today or yesterday
+            for (const task of tasks) {
+              const targetDate = task.target_date ? new Date(task.target_date) : null;
+              if (!targetDate) continue;
+
+              const jobData = {
+                id: job.id,
+                number: job.number,
+                description: job.description,
+                site_address: job.site_address || '',
+                site_address_line1: job.site_address_line1 || '',
+                site_address_city: job.site_address_city || '',
+                contact_name: job.contact?.name || '',
+                contact_phone: job.contact?.phone || '',
+                status: job.status?.name || '',
+                members: members.map(m => ({
+                  id: m.staff?.id || m.id,
+                  name: m.staff?.name || m.name || 'Unknown'
+                })),
+                task: {
+                  id: task.id,
+                  name: task.name,
+                  target_date: task.target_date,
+                  progress: task.progress || 0
+                }
+              };
+
+              // Check if task is for today
+              if (targetDate >= today && targetDate < tomorrow) {
+                todaysJobs.push(jobData);
+              }
+              // Check if task is for yesterday
+              else if (targetDate >= yesterday && targetDate < today) {
+                yesterdaysJobs.push(jobData);
+              }
+            }
+          } catch (e) {
+            console.warn(`Could not fetch details for job ${job.id}:`, e.message);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch Jobman data:', e.message);
+      }
+
+      // Build pre-fill data for the form
+      const prefillData = {
+        meeting_date: today.toISOString().split('T')[0],
+        meeting_time: '06:00',
+        staff_present: staff.map(s => s.name).join(', '),
+
+        // Yesterday's jobs - Installer 1
+        installer1_name: yesterdaysJobs[0]?.members[0]?.name || '',
+        installer1_yesterday_job: yesterdaysJobs[0]?.site_address || yesterdaysJobs[0]?.site_address_line1 || '',
+        installer1_stage: yesterdaysJobs[0]?.task?.name || '',
+
+        // Yesterday's jobs - Installer 2
+        installer2_name: yesterdaysJobs[1]?.members[0]?.name || (yesterdaysJobs[0]?.members[1]?.name || ''),
+        installer2_yesterday_job: yesterdaysJobs[1]?.site_address || (yesterdaysJobs[0]?.members[1] ? yesterdaysJobs[0]?.site_address : '') || '',
+        installer2_stage: yesterdaysJobs[1]?.task?.name || '',
+
+        // Today's jobs - Installer 1
+        installer1_job1_address: todaysJobs[0]?.site_address || todaysJobs[0]?.site_address_line1 || '',
+        installer1_job1_scope: todaysJobs[0]?.description || todaysJobs[0]?.task?.name || '',
+        installer1_job2_address: todaysJobs.length > 2 ? (todaysJobs[2]?.site_address || '') : '',
+        installer1_job2_scope: todaysJobs.length > 2 ? (todaysJobs[2]?.description || '') : '',
+
+        // Today's jobs - Installer 2
+        installer2_job1_address: todaysJobs[1]?.site_address || todaysJobs[1]?.site_address_line1 || '',
+        installer2_job1_scope: todaysJobs[1]?.description || todaysJobs[1]?.task?.name || '',
+        installer2_job2_address: todaysJobs.length > 3 ? (todaysJobs[3]?.site_address || '') : '',
+        installer2_job2_scope: todaysJobs.length > 3 ? (todaysJobs[3]?.description || '') : '',
+      };
+
+      res.json({
+        todaysJobs,
+        yesterdaysJobs,
+        staff,
+        prefillData
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 module.exports = router;

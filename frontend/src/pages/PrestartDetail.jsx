@@ -74,6 +74,18 @@ export default function PrestartDetail() {
       } catch (e) {
         console.warn('Could not load templates:', e);
       }
+
+      // Fetch Jobman data to pre-fill form if form data is empty
+      if (!meetingData.formData || Object.keys(meetingData.formData).length === 0) {
+        try {
+          const jobmanRes = await prestartApi.getJobmanData();
+          const prefill = jobmanRes.data.prefillData || {};
+          // Merge Jobman prefill data with any existing form data
+          setFormData(prev => ({ ...prefill, ...prev }));
+        } catch (e) {
+          console.warn('Could not fetch Jobman data:', e);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {

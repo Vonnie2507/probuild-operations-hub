@@ -379,6 +379,50 @@ class JobmanAPI {
   }
 
   /**
+   * Get job members (staff assigned to this job)
+   * @param {string} jobId - Job UUID
+   */
+  async getJobMembers(jobId) {
+    return this.request(this.orgEndpoint(`/jobs/${jobId}/members`));
+  }
+
+  /**
+   * Get jobs scheduled for a specific date range
+   * @param {Date} startDate - Start date
+   * @param {Date} endDate - End date
+   */
+  async getJobsForDateRange(startDate, endDate) {
+    // Get all active jobs and filter by task target dates
+    const jobs = await this.listJobs({ limit: 100 });
+
+    const jobsWithTasks = await Promise.all(
+      (jobs.data || jobs || []).map(async (job) => {
+        try {
+          const tasks = await this.getJobTasks(job.id);
+          const members = await this.getJobMembers(job.id);
+          return {
+            ...job,
+            tasks: tasks.data || tasks || [],
+            members: members.data || members || []
+          };
+        } catch (e) {
+          return { ...job, tasks: [], members: [] };
+        }
+      })
+    );
+
+    // Filter jobs that have tasks scheduled within the date range
+    return jobsWithTasks.filter(job => {
+      if (!job.tasks || job.tasks.length === 0) return false;
+      return job.tasks.some(task => {
+        const targetDate = task.target_date ? new Date(task.target_date) : null;
+        if (!targetDate) return false;
+        return targetDate >= startDate && targetDate <= endDate;
+      });
+    });
+  }
+
+  /**
    * Update job task progress
    * @param {string} jobId - Job UUID
    * @param {string} taskId - Task UUID

@@ -29,6 +29,7 @@ export const prestartApi = {
   create: (data) => api.post('/prestart', data),
   addJob: (id, jobData) => api.post(`/prestart/${id}/jobs`, jobData),
   update: (id, data) => api.put(`/prestart/${id}`, data),
+  getJobmanData: () => api.get('/prestart/jobman-data'),
 };
 
 // Jobman API (proxied through backend)
