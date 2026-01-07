@@ -176,8 +176,24 @@ router.post('/',
 
       const { meetingDate, staffPresent } = req.body;
 
-      // TODO: Get actual user from auth middleware
-      const runById = req.user?.id || 'system';
+      // Get user ID - from auth or find default admin user
+      let runById = req.user?.id;
+
+      if (!runById) {
+        // Find the first admin user as fallback
+        const adminUser = await prisma.user.findFirst({
+          where: { role: 'ADMIN', isActive: true },
+          select: { id: true }
+        });
+
+        if (!adminUser) {
+          return res.status(400).json({
+            error: 'No admin user found. Please run database seed.'
+          });
+        }
+
+        runById = adminUser.id;
+      }
 
       const meeting = await prisma.prestartMeeting.create({
         data: {
