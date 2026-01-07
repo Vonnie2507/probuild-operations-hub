@@ -57,11 +57,17 @@ export default function DocumentDetail() {
     init();
   }, [id, templateId, isNew]);
 
-  // Listen for form data from iframe
+  // Listen for messages from iframe (form data and resize)
   useEffect(() => {
     function handleMessage(event) {
       if (event.data?.type === 'formData') {
         setFormData(event.data.data);
+      }
+      if (event.data?.type === 'resize') {
+        const iframe = document.getElementById('formFrame');
+        if (iframe) {
+          iframe.style.height = event.data.height + 'px';
+        }
       }
     }
     window.addEventListener('message', handleMessage);
@@ -232,10 +238,11 @@ export default function DocumentDetail() {
       {/* Form Content - Rendered from Template */}
       <div
         ref={formRef}
-        className="bg-white rounded-xl shadow p-8 print:shadow-none overflow-hidden"
+        className="bg-white rounded-xl shadow print:shadow-none overflow-hidden"
       >
         {/* Render the fillable form in isolated container */}
         <iframe
+          id="formFrame"
           srcDoc={`
             <!DOCTYPE html>
             <html>
@@ -244,7 +251,15 @@ export default function DocumentDetail() {
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
               <style>
-                body { font-family: system-ui, -apple-system, sans-serif; padding: 0; margin: 0; }
+                html, body {
+                  font-family: system-ui, -apple-system, sans-serif;
+                  padding: 0;
+                  margin: 0;
+                  min-height: 100%;
+                }
+                body {
+                  padding: 24px;
+                }
                 input, textarea, select {
                   border: 1px solid #d1d5db;
                   border-radius: 0.5rem;
@@ -263,22 +278,26 @@ export default function DocumentDetail() {
             <body>
               ${fillableHtml}
               <script>
-                // Send form data to parent on change
-                document.body.addEventListener('change', (e) => {
-                  const inputs = document.querySelectorAll('[data-field]');
-                  const data = {};
-                  inputs.forEach(input => {
-                    if (input.type === 'checkbox') {
-                      data[input.dataset.field] = input.checked;
-                    } else {
-                      data[input.dataset.field] = input.value;
-                    }
-                  });
-                  window.parent.postMessage({ type: 'formData', data }, '*');
+                // Auto-resize iframe to fit content
+                function resizeFrame() {
+                  const height = document.body.scrollHeight;
+                  window.parent.postMessage({ type: 'resize', height: height + 50 }, '*');
+                }
+
+                // Resize on load and after images load
+                window.addEventListener('load', resizeFrame);
+                setTimeout(resizeFrame, 100);
+                setTimeout(resizeFrame, 500);
+
+                // Resize on any DOM changes
+                new MutationObserver(resizeFrame).observe(document.body, {
+                  childList: true,
+                  subtree: true,
+                  attributes: true
                 });
 
-                // Also send on input for immediate updates
-                document.body.addEventListener('input', (e) => {
+                // Send form data to parent on change
+                function sendFormData() {
                   const inputs = document.querySelectorAll('[data-field]');
                   const data = {};
                   inputs.forEach(input => {
@@ -289,13 +308,16 @@ export default function DocumentDetail() {
                     }
                   });
                   window.parent.postMessage({ type: 'formData', data }, '*');
-                });
+                }
+
+                document.body.addEventListener('change', sendFormData);
+                document.body.addEventListener('input', sendFormData);
               </script>
             </body>
             </html>
           `}
           className="w-full border-0"
-          style={{ minHeight: '800px', height: 'auto' }}
+          style={{ minHeight: '100vh', width: '100%' }}
           title="Form"
         />
       </div>
