@@ -109,24 +109,27 @@ router.get('/jobman-data',
       let staff = [];
 
       try {
-        // Get all staff
+        // Get all staff - Jobman returns {staff: {data: [...]}}
         const staffResponse = await jobman.listStaff({ limit: 50 });
-        // Handle different response structures from Jobman API
-        if (Array.isArray(staffResponse)) {
-          staff = staffResponse;
-        } else if (staffResponse && Array.isArray(staffResponse.data)) {
+        if (staffResponse?.staff?.data && Array.isArray(staffResponse.staff.data)) {
+          staff = staffResponse.staff.data;
+        } else if (staffResponse?.data && Array.isArray(staffResponse.data)) {
           staff = staffResponse.data;
+        } else if (Array.isArray(staffResponse)) {
+          staff = staffResponse;
         } else {
           staff = [];
         }
 
-        // Get jobs for today and yesterday
+        // Get jobs - Jobman returns {jobs: {data: [...]}}
         const allJobs = await jobman.listJobs({ limit: 100 });
         let jobs = [];
-        if (Array.isArray(allJobs)) {
-          jobs = allJobs;
-        } else if (allJobs && Array.isArray(allJobs.data)) {
+        if (allJobs?.jobs?.data && Array.isArray(allJobs.jobs.data)) {
+          jobs = allJobs.jobs.data;
+        } else if (allJobs?.data && Array.isArray(allJobs.data)) {
           jobs = allJobs.data;
+        } else if (Array.isArray(allJobs)) {
+          jobs = allJobs;
         }
 
         // For each job, get tasks and members to determine scheduling
@@ -137,8 +140,24 @@ router.get('/jobman-data',
               jobman.getJobMembers(job.id)
             ]);
 
-            const tasks = tasksRes.data || tasksRes || [];
-            const members = membersRes.data || membersRes || [];
+            // Handle nested response structures from Jobman
+            let tasks = [];
+            if (tasksRes?.tasks?.data && Array.isArray(tasksRes.tasks.data)) {
+              tasks = tasksRes.tasks.data;
+            } else if (tasksRes?.data && Array.isArray(tasksRes.data)) {
+              tasks = tasksRes.data;
+            } else if (Array.isArray(tasksRes)) {
+              tasks = tasksRes;
+            }
+
+            let members = [];
+            if (membersRes?.members?.data && Array.isArray(membersRes.members.data)) {
+              members = membersRes.members.data;
+            } else if (membersRes?.data && Array.isArray(membersRes.data)) {
+              members = membersRes.data;
+            } else if (Array.isArray(membersRes)) {
+              members = membersRes;
+            }
 
             // Check if any task is scheduled for today or yesterday
             for (const task of tasks) {
