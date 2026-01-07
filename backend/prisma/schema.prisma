@@ -119,6 +119,11 @@ model LiveDocument {
   // Custom Fields (JSON for anything else)
   customFields      Json?   @map("custom_fields") @default("{}")
 
+  // Template-based forms
+  templateId        String? @map("template_id")
+  templateName      String? @map("template_name")
+  formData          Json?   @map("form_data") @default("{}")
+
   // Created By
   createdById       String  @map("created_by_id")
   createdBy         User    @relation("CreatedBy", fields: [createdById], references: [id])
