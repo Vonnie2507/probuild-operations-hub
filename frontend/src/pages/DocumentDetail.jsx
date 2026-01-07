@@ -256,9 +256,17 @@ export default function DocumentDetail() {
                   padding: 0;
                   margin: 0;
                   min-height: 100%;
+                  width: 100%;
                 }
                 body {
                   padding: 24px;
+                }
+                /* Force full width on all containers */
+                body > *, body > * > *, .container, .wrapper, .content, section, article, main, form, div {
+                  max-width: 100% !important;
+                  width: 100% !important;
+                  margin-left: 0 !important;
+                  margin-right: 0 !important;
                 }
                 input, textarea, select {
                   border: 1px solid #d1d5db;
