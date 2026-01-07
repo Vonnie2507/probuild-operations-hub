@@ -40,7 +40,7 @@ app.use((req, res, next) => {
   if (req.path === '/api/webhooks/jobman') {
     next();
   } else {
-    express.json()(req, res, next);
+    express.json({ limit: '10mb' })(req, res, next);
   }
 });
 
