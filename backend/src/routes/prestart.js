@@ -111,11 +111,23 @@ router.get('/jobman-data',
       try {
         // Get all staff
         const staffResponse = await jobman.listStaff({ limit: 50 });
-        staff = staffResponse.data || staffResponse || [];
+        // Handle different response structures from Jobman API
+        if (Array.isArray(staffResponse)) {
+          staff = staffResponse;
+        } else if (staffResponse && Array.isArray(staffResponse.data)) {
+          staff = staffResponse.data;
+        } else {
+          staff = [];
+        }
 
         // Get jobs for today and yesterday
         const allJobs = await jobman.listJobs({ limit: 100 });
-        const jobs = allJobs.data || allJobs || [];
+        let jobs = [];
+        if (Array.isArray(allJobs)) {
+          jobs = allJobs;
+        } else if (allJobs && Array.isArray(allJobs.data)) {
+          jobs = allJobs.data;
+        }
 
         // For each job, get tasks and members to determine scheduling
         for (const job of jobs) {
