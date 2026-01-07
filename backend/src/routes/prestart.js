@@ -203,6 +203,11 @@ router.get('/jobman-data',
         console.warn('Could not fetch Jobman data:', e.message);
       }
 
+      // Filter staff by role - get installers (those with "Installation" role)
+      const installers = staff.filter(s =>
+        s.roles && s.roles.some(r => r.name === 'Installation')
+      );
+
       // Build pre-fill data for the form - field names match template placeholders
       const prefillData = {
         // Meta fields - match template {{ field_name }} placeholders
@@ -212,20 +217,20 @@ router.get('/jobman-data',
         run_by: staff[0]?.name || '', // Default to first staff member
         staff_present: staff.map(s => s.name).join(', '),
 
-        // Yesterday's jobs - Installer 1
-        installer1_name: yesterdaysJobs[0]?.members[0]?.name || '',
+        // Yesterday's jobs - Installer 1 (use installers list, fallback to job members)
+        installer1_name: installers[0]?.name || yesterdaysJobs[0]?.members[0]?.name || '',
         installer1_yesterday_job: yesterdaysJobs[0]?.site_address || yesterdaysJobs[0]?.site_address_line1 || '',
         installer1_stage: yesterdaysJobs[0]?.task?.name || '',
         installer1_yesterday_notes: '',
 
         // Yesterday's jobs - Installer 2
-        installer2_name: yesterdaysJobs[1]?.members[0]?.name || (yesterdaysJobs[0]?.members[1]?.name || ''),
-        installer2_yesterday_job: yesterdaysJobs[1]?.site_address || (yesterdaysJobs[0]?.members[1] ? yesterdaysJobs[0]?.site_address : '') || '',
+        installer2_name: installers[1]?.name || yesterdaysJobs[1]?.members[0]?.name || '',
+        installer2_yesterday_job: yesterdaysJobs[1]?.site_address || yesterdaysJobs[1]?.site_address_line1 || '',
         installer2_stage: yesterdaysJobs[1]?.task?.name || '',
         installer2_yesterday_notes: '',
 
         // Yesterday's jobs - Installer 3
-        installer3_name: yesterdaysJobs[2]?.members[0]?.name || '',
+        installer3_name: installers[2]?.name || yesterdaysJobs[2]?.members[0]?.name || '',
         installer3_yesterday_job: yesterdaysJobs[2]?.site_address || yesterdaysJobs[2]?.site_address_line1 || '',
         installer3_stage: yesterdaysJobs[2]?.task?.name || '',
         installer3_yesterday_notes: '',
@@ -263,6 +268,7 @@ router.get('/jobman-data',
         todaysJobs,
         yesterdaysJobs,
         staff,
+        installers, // Staff with "Installation" role
         prefillData
       });
     } catch (error) {
