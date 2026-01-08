@@ -94,7 +94,7 @@ export default function Dashboard() {
             New Document
           </button>
           <Link
-            to="/prestart/new"
+            to="/prestart-meeting"
             className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition-colors"
           >
             <ClipboardList className="w-4 h-4" />

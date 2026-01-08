@@ -64,4 +64,37 @@ export const templatesApi = {
     api.post('/templates/preview-raw', { htmlTemplate, cssStyles, data }),
 };
 
+// Pre-Start Meeting API (New Structured System)
+export const prestartMeetingApi = {
+  // Staff
+  getStaff: (activeOnly = true) => api.get('/prestart-meeting/staff', { params: { activeOnly } }),
+  getStaffById: (id) => api.get(`/prestart-meeting/staff/${id}`),
+  createStaff: (data) => api.post('/prestart-meeting/staff', data),
+  updateStaff: (id, data) => api.put(`/prestart-meeting/staff/${id}`, data),
+
+  // Compliance Config
+  getComplianceConfig: (activeOnly = true) => api.get('/prestart-meeting/compliance-config', { params: { activeOnly } }),
+
+  // Meetings
+  getToday: () => api.get('/prestart-meeting/today'),
+  getHistory: (params = {}) => api.get('/prestart-meeting/history', { params }),
+  getById: (id) => api.get(`/prestart-meeting/${id}`),
+  getByDate: (date) => api.get(`/prestart-meeting/date/${date}`),
+  create: (data) => api.post('/prestart-meeting', data),
+  update: (id, data) => api.put(`/prestart-meeting/${id}`, data),
+
+  // Meeting Sections
+  saveYesterdayReviews: (id, reviews) => api.put(`/prestart-meeting/${id}/yesterday-reviews`, { reviews }),
+  saveCompliance: (id, checks) => api.put(`/prestart-meeting/${id}/compliance`, { checks }),
+  saveContent: (id, sections) => api.put(`/prestart-meeting/${id}/content`, { sections }),
+
+  // Meeting Actions
+  close: (id, closeChecks) => api.post(`/prestart-meeting/${id}/close`, closeChecks),
+  reopen: (id) => api.post(`/prestart-meeting/${id}/reopen`),
+
+  // Field Mappings (future)
+  getFieldMappings: (tableName) => api.get('/prestart-meeting/field-mappings', { params: { tableName } }),
+  updateFieldMapping: (id, data) => api.put(`/prestart-meeting/field-mappings/${id}`, data),
+};
+
 export default api;

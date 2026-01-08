@@ -441,3 +441,202 @@ model JobmanSyncLog {
   @@index([createdAt])
   @@map("jobman_sync_log")
 }
+
+// ============================================
+// FIELD MAPPING (Future Jobman API Integration)
+// ============================================
+
+model FieldMapping {
+  id              String   @id @default(uuid())
+  tableName       String   @map("table_name")      // e.g., "Staff", "PreStartMeeting"
+  ourFieldName    String   @map("our_field_name")  // e.g., "name", "jobDescription"
+  jobmanFieldName String?  @map("jobman_field_name") // Fill in later when API fields known
+  jobmanEndpoint  String?  @map("jobman_endpoint")   // e.g., "/staff", "/jobs"
+  syncEnabled     Boolean  @default(false) @map("sync_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tableName, ourFieldName])
+  @@index([tableName])
+  @@map("field_mappings")
+}
+
+// ============================================
+// STAFF (Operations Team)
+// ============================================
+
+model Staff {
+  id              String    @id @default(uuid())
+  jobmanId        String?   @map("jobman_id")       // For future Jobman sync
+  jobmanSyncedAt  DateTime? @map("jobman_synced_at")
+  name            String
+  role            StaffRole
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  meetingsRun       PreStartMeeting[]       @relation("MeetingRunBy")
+  meetingAttendance MeetingAttendee[]
+  yesterdayReviews  YesterdayJobReview[]
+  complianceChecks  ComplianceCheck[]
+
+  @@index([role])
+  @@index([isActive])
+  @@map("staff")
+}
+
+enum StaffRole {
+  field_installer
+  workshop
+  operations
+  admin
+}
+
+// ============================================
+// PRE-START MEETING (New Structured System)
+// ============================================
+
+model PreStartMeeting {
+  id              String    @id @default(uuid())
+  jobmanId        String?   @map("jobman_id")
+  jobmanSyncedAt  DateTime? @map("jobman_synced_at")
+  meetingDate     DateTime  @unique @map("meeting_date") @db.Date
+  startTime       DateTime  @map("start_time")
+  endTime         DateTime? @map("end_time")
+  durationMinutes Int?      @map("duration_minutes")
+  runById         String    @map("run_by_id")
+  runBy           Staff     @relation("MeetingRunBy", fields: [runById], references: [id])
+  status          MeetingStatus @default(draft)
+  editLog         Json      @default("[]") @map("edit_log") // Array of edit events
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  attendees         MeetingAttendee[]
+  yesterdayReviews  YesterdayJobReview[]
+  complianceChecks  ComplianceCheck[]
+  content           MeetingContent[]
+  closeChecks       MeetingCloseCheck?
+
+  @@index([meetingDate])
+  @@index([status])
+  @@map("pre_start_meetings")
+}
+
+enum MeetingStatus {
+  draft
+  completed
+}
+
+// Meeting Attendees (Many-to-Many)
+model MeetingAttendee {
+  id        String          @id @default(uuid())
+  meetingId String          @map("meeting_id")
+  meeting   PreStartMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  staffId   String          @map("staff_id")
+  staff     Staff           @relation(fields: [staffId], references: [id])
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@unique([meetingId, staffId])
+  @@map("meeting_attendees")
+}
+
+// ============================================
+// YESTERDAY'S JOB REVIEW
+// ============================================
+
+model YesterdayJobReview {
+  id             String          @id @default(uuid())
+  meetingId      String          @map("meeting_id")
+  meeting        PreStartMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  staffId        String          @map("staff_id")
+  staff          Staff           @relation(fields: [staffId], references: [id])
+  jobmanJobId    String?         @map("jobman_job_id") // Link to Jobman job later
+  jobDescription String          @map("job_description") @db.Text
+  stageLeftAt    String?         @map("stage_left_at")
+  notes          String?         @db.Text
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@index([meetingId])
+  @@index([staffId])
+  @@map("yesterday_job_reviews")
+}
+
+// ============================================
+// COMPLIANCE CHECK
+// ============================================
+
+model ComplianceCheck {
+  id        String          @id @default(uuid())
+  meetingId String          @map("meeting_id")
+  meeting   PreStartMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  staffId   String          @map("staff_id")
+  staff     Staff           @relation(fields: [staffId], references: [id])
+  checkType String          @map("check_type") // References ComplianceCheckConfig.checkKey
+  completed Boolean         @default(false)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@unique([meetingId, staffId, checkType])
+  @@index([meetingId])
+  @@map("compliance_checks")
+}
+
+// Compliance Check Configuration (Editable without code changes)
+model ComplianceCheckConfig {
+  id              String   @id @default(uuid())
+  checkKey        String   @unique @map("check_key") // e.g., "clocked_in_out"
+  checkLabel      String   @map("check_label")       // e.g., "Clocked in/out"
+  applicableRoles String[] @map("applicable_roles")  // ["field_installer", "workshop"]
+  sortOrder       Int      @map("sort_order")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("compliance_check_configs")
+}
+
+// ============================================
+// MEETING CONTENT (Sections)
+// ============================================
+
+model MeetingContent {
+  id          String          @id @default(uuid())
+  meetingId   String          @map("meeting_id")
+  meeting     PreStartMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  sectionType ContentSection  @map("section_type")
+  content     String          @db.Text
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@unique([meetingId, sectionType])
+  @@map("meeting_content")
+}
+
+enum ContentSection {
+  challenge
+  resolution
+  win
+  safetyTalk
+  todaysJobs
+}
+
+// ============================================
+// MEETING CLOSE CHECKS
+// ============================================
+
+model MeetingCloseCheck {
+  id                  String          @id @default(uuid())
+  meetingId           String          @unique @map("meeting_id")
+  meeting             PreStartMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  understandJobs      Boolean         @default(false) @map("understand_jobs")
+  haveToolsMaterials  Boolean         @default(false) @map("have_tools_materials")
+  questionsAddressed  Boolean         @default(false) @map("questions_addressed")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@map("meeting_close_checks")
+}

@@ -6,13 +6,14 @@ import {
   Home,
   Users,
   Calendar,
-  FolderOpen
+  FolderOpen,
+  History
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Live Documents', href: '/documents', icon: FileText },
-  { name: 'Pre-Start Meetings', href: '/prestart', icon: ClipboardList },
+  { name: 'Pre-Start Meeting', href: '/prestart-meeting', icon: ClipboardList },
   { name: 'Forms & Templates', href: '/templates', icon: FolderOpen },
   { name: 'Schedule', href: '/schedule', icon: Calendar },
   { name: 'Settings', href: '/settings', icon: Settings },

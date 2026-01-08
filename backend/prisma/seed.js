@@ -51,6 +51,79 @@ async function main() {
 
   console.log('Created sample document:', sampleDoc.customerName);
 
+  // ============================================
+  // STAFF SEEDING
+  // ============================================
+  console.log('Seeding staff...');
+
+  const staffData = [
+    { name: 'Craig', role: 'operations' },
+    { name: 'Jake', role: 'field_installer' },
+    { name: 'Jarred', role: 'field_installer' },
+    { name: 'George', role: 'workshop' },
+    { name: 'David', role: 'field_installer' },
+    { name: 'Dave', role: 'field_installer' },
+    { name: 'Bradley', role: 'field_installer' },
+    { name: 'Vonnie', role: 'admin' },
+  ];
+
+  for (const staff of staffData) {
+    await prisma.staff.upsert({
+      where: {
+        id: `staff-${staff.name.toLowerCase()}`
+      },
+      update: {
+        name: staff.name,
+        role: staff.role,
+        isActive: true
+      },
+      create: {
+        id: `staff-${staff.name.toLowerCase()}`,
+        name: staff.name,
+        role: staff.role,
+        isActive: true,
+      },
+    });
+    console.log(`  Created/updated staff: ${staff.name} (${staff.role})`);
+  }
+
+  // ============================================
+  // COMPLIANCE CHECK CONFIG SEEDING
+  // ============================================
+  console.log('Seeding compliance check configs...');
+
+  const complianceConfigs = [
+    { checkKey: 'clocked_in_out', checkLabel: 'Clocked in/out', applicableRoles: ['field_installer', 'workshop'], sortOrder: 1 },
+    { checkKey: 'job_checkin_out', checkLabel: 'Job check-in/out', applicableRoles: ['field_installer'], sortOrder: 2 },
+    { checkKey: 'progress_photos', checkLabel: 'Progress photos uploaded', applicableRoles: ['field_installer'], sortOrder: 3 },
+    { checkKey: 'tasks_ticked', checkLabel: 'Tasks ticked off', applicableRoles: ['field_installer'], sortOrder: 4 },
+    { checkKey: 'stock_check', checkLabel: 'Stock check on return', applicableRoles: ['field_installer'], sortOrder: 5 },
+    { checkKey: 'vehicle_cleaned', checkLabel: 'Vehicle cleaned', applicableRoles: ['field_installer'], sortOrder: 6 },
+    { checkKey: 'timer_start_stop', checkLabel: 'Timer start/stop for tasks', applicableRoles: ['workshop'], sortOrder: 2 },
+    { checkKey: 'qa_photos', checkLabel: 'QA photos submitted', applicableRoles: ['workshop'], sortOrder: 3 },
+    { checkKey: 'workshop_clean', checkLabel: 'Workshop kept clean', applicableRoles: ['workshop'], sortOrder: 4 },
+  ];
+
+  for (const config of complianceConfigs) {
+    await prisma.complianceCheckConfig.upsert({
+      where: { checkKey: config.checkKey },
+      update: {
+        checkLabel: config.checkLabel,
+        applicableRoles: config.applicableRoles,
+        sortOrder: config.sortOrder,
+        isActive: true,
+      },
+      create: {
+        checkKey: config.checkKey,
+        checkLabel: config.checkLabel,
+        applicableRoles: config.applicableRoles,
+        sortOrder: config.sortOrder,
+        isActive: true,
+      },
+    });
+    console.log(`  Created/updated compliance config: ${config.checkLabel}`);
+  }
+
   console.log('Seeding completed!');
 }
 

@@ -17,6 +17,7 @@ const webhooksRoutes = require('./routes/webhooks');
 const filesRoutes = require('./routes/files');
 const authRoutes = require('./routes/auth');
 const templatesRoutes = require('./routes/templates');
+const prestartMeetingRoutes = require('./routes/prestartMeeting');
 
 // Initialise Prisma
 const prisma = new PrismaClient();
@@ -71,6 +72,7 @@ app.use('/api/jobman', jobmanRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/templates', templatesRoutes);
+app.use('/api/prestart-meeting', prestartMeetingRoutes);
 
 // ============================================
 // ERROR HANDLING
@@ -161,6 +163,7 @@ async function start() {
 ║   • /api/files      - File uploads                    ║
 ║   • /api/webhooks   - Webhook receivers               ║
 ║   • /api/templates  - Form templates                  ║
+║   • /api/prestart-meeting - Pre-Start Meeting System  ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
       `);

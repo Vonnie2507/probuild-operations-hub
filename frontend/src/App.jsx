@@ -6,6 +6,11 @@ import DocumentDetail from './pages/DocumentDetail';
 import Prestart from './pages/Prestart';
 import PrestartDetail from './pages/PrestartDetail';
 import Templates from './pages/Templates';
+import PreStartMeetingNew from './pages/PreStartMeetingNew';
+import MeetingHistory from './pages/MeetingHistory';
+import MeetingDetail from './pages/MeetingDetail';
+import StaffManagement from './pages/StaffManagement';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -19,7 +24,12 @@ function App() {
           <Route path="/prestart/:id" element={<PrestartDetail />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/schedule" element={<ComingSoon title="Schedule" />} />
-          <Route path="/settings" element={<ComingSoon title="Settings" />} />
+          <Route path="/settings" element={<Settings />} />
+          {/* New Pre-Start Meeting System */}
+          <Route path="/prestart-meeting" element={<PreStartMeetingNew />} />
+          <Route path="/prestart-meeting/:id" element={<MeetingDetail />} />
+          <Route path="/meeting-history" element={<MeetingHistory />} />
+          <Route path="/staff" element={<StaffManagement />} />
         </Routes>
       </Layout>
     </BrowserRouter>
